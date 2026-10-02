@@ -1,0 +1,67 @@
+name: Pleroma tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: PHP ${{ matrix.php }} / Node 24
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        php: ['8.2', '8.3', '8.4']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          extensions: openssl, pdo_sqlite, curl, mbstring, fileinfo
+          coverage: none
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: PHP and JavaScript syntax
+        shell: bash
+        run: |
+          while IFS= read -r -d '' file; do php -l "$file"; done < <(git ls-files -z '*.php')
+          while IFS= read -r -d '' file; do node --check "$file"; done < <(git ls-files -z '*.js' '*.mjs' '*.cjs')
+      - name: Core persistence and recovery
+        run: php tests/run.php
+      - name: Security and migration regression tests
+        run: php tests/backend-security.php
+      - name: Large encrypted backup recovery
+        run: php -d memory_limit=512M tests/restore-cli.php
+      - name: AI fixtures (no remote requests)
+        run: php tests/ai.php
+      - name: Google Calendar fixtures (no remote requests)
+        run: php tests/calendar.php
+      - name: Real HTTP integration tests
+        run: node tests/http.mjs
+
+  browser:
+    name: Desktop, Android layout and private cache checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install isolated browser test tools
+        run: |
+          npm install --no-save --package-lock=false playwright@1.62.1
+          npx playwright install --with-deps chromium
+      - name: Browser regression tests
+        run: node tests/frontend.mjs
+      - name: Public shell and private cache tests
+        run: node tests/pwa.cjs
+      - name: Standalone HTML and responsive layout
+        run: node tests/demo.mjs

@@ -1,0 +1,15 @@
+config.php
+public/_private_path.php
+private-data/
+*.sqlite
+*.sqlite-*
+*.db
+*.db-*
+*.pleroma
+*.log
+.env*
+node_modules/
+test-results/
+playwright-report/
+tmp/
+dist/
